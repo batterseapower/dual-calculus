@@ -14,13 +14,13 @@ step (m `Cut` k) | Just (Just f, m) <- eval m = Just $ m `Cut` CoBind ecks (f (V
  --  2) We are cutting against a non-value we can't go inside: i.e. a bind
  --
  -- We tackle 2) first. NB: it doesn't matter if the bind is also a value, the result is confluent
-step (Bind s a `Cut` k)             = {- trace (prettyShow ("SHAREABLE", k)) $ -} Just $ substCoTermS a k s
+step (Bind s a `Cut` k)             = {- trace (prettyShow ("SHAREABLE", k)) $ -} Just $ substStmt (coTermSubst a k) s
  -- The only remaining possibility is 1), so we can run the other clauses
 step (Data con v `Cut` CoData alts) = Just $ v `Cut` head [k | (mb_con, k) <- alts, mb_con == Just con || isNothing mb_con]
 step (Tup vs `Cut` CoTup i k)       = Just $ (vs !! i) `Cut` k
 step (Not k `Cut` CoNot m)          = Just $ m `Cut` k
 step (Lam x m `Cut` CoLam n k)      = Just $ m `Cut` CoBind x (n `Cut` k)
-step (v `Cut` CoBind x s)           = Just $ substTermS x v s
+step (v `Cut` CoBind x s)           = Just $ substStmt (termSubst x v) s
  -- We can't reduce if any one of these occurs:
  --  1) The term is a variable
  --  2) The coterm is a covariable

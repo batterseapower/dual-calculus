@@ -2,52 +2,100 @@ module Substitution where
 
 import Syntax
 
+import Control.Arrow (first, second)
 
--- FIXME: this is all so, so wrong. Must rename binders if we want to ensure no capture of FVs of thing being substituted
--- It will work if the FVs of the thing being substituted are all fresh
-
-substTerm y n m = case m of
-  Var x | x == y    -> n
-        | otherwise -> Var x
-  Data con m -> Data con (substTerm y n m)
-  Tup ms -> Tup (map (substTerm y n) ms)
-  Not k -> Not (substTermK y n k)
-  Lam x m | x == y    -> Lam x m
-          | otherwise -> Lam x (substTerm y n m)
-  Bind s a -> Bind (substTermS y n s) a
-  Fix x m | x == y    -> Fix x m
-          | otherwise -> Fix x (substTerm y n m)
-
-substTermK :: String -> Term -> CoTerm -> CoTerm
-substTermK y n k = case k of
-  CoVar a -> CoVar a
-  CoData alts -> CoData [(mb_con, substTermK y n k) | (mb_con, k) <- alts]
-  CoTup i k -> CoTup i (substTermK y n k)
-  CoNot m -> CoNot (substTerm y n m)
-  CoLam m k -> CoLam (substTerm y n m) (substTermK y n k)
-  CoBind x s | x == y    -> CoBind x s
-             | otherwise -> CoBind x (substTermS y n s)
-
-substTermS y n (m `Cut` k) = {- trace (prettyShow (y, n, m, k)) $ -} substTerm y n m `Cut` substTermK y n k
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 
-substCoTerm b l k = case k of
-  CoVar a | a == b    -> l
-          | otherwise -> CoVar a
-  CoData alts -> CoData [(mb_con, substCoTerm b l k) | (mb_con, k) <- alts]
-  CoTup i k -> CoTup i (substCoTerm b l k)
-  CoNot m -> CoNot (substCoTermM b l m)
-  CoLam m k -> CoLam (substCoTermM b l m) (substCoTerm b l k)
-  CoBind x s -> CoBind x (substCoTermS b l s)
+type InScopeSet = (S.Set Var, S.Set CoVar)
 
-substCoTermM b l m = case m of
-  Var x -> Var x
-  Data con m -> Data con (substCoTermM b l m)
-  Tup ms -> Tup (map (substCoTermM b l) ms)
-  Not k -> Not (substCoTerm b l k)
-  Lam x m -> Lam x (substCoTermM b l m)
-  Bind s a | a == b    -> Bind s a
-           | otherwise -> Bind (substCoTermS b l s) a
-  Fix x m -> Fix x (substCoTermM b l m)
+emptyInScopeSet :: InScopeSet
+emptyInScopeSet = (S.empty, S.empty)
 
-substCoTermS b l (m `Cut` k) = substCoTermM b l m `Cut` substCoTerm b l k
+
+extendInScopeSetVar :: InScopeSet -> Var -> InScopeSet
+extendInScopeSetVar iss x = first (S.insert x) iss
+
+extendInScopeSetCoVar :: InScopeSet -> CoVar -> InScopeSet
+extendInScopeSetCoVar iss a = second (S.insert a) iss
+
+
+data Subst = Subst {
+    subst_terms   :: M.Map Var Term,
+    subst_coterms :: M.Map CoVar CoTerm,
+    subst_inscope :: InScopeSet
+  }
+
+emptySubst :: InScopeSet -> Subst
+emptySubst iss = Subst M.empty M.empty iss
+
+termSubst :: Var -> Term -> Subst
+termSubst = extendSubstTerm (emptySubst emptyInScopeSet)
+
+coTermSubst :: CoVar -> CoTerm -> Subst
+coTermSubst = extendSubstCoTerm (emptySubst emptyInScopeSet)
+
+
+extendSubstTerm :: Subst -> Var -> Term -> Subst
+extendSubstTerm s x m = s { subst_terms = M.insert x m (subst_terms s) }
+
+extendSubstCoTerm :: Subst -> CoVar -> CoTerm -> Subst
+extendSubstCoTerm s a k = s { subst_coterms = M.insert a k (subst_coterms s) }
+
+uniqAway :: String -> S.Set String -> String
+uniqAway x iss = go 0
+  where go n | x' `S.notMember` iss = x'
+             | otherwise            = go (n + 1)
+          where x' = x ++ show n
+
+substAnyBinder :: (InScopeSet -> S.Set String) -> (InScopeSet -> S.Set String -> InScopeSet)
+               -> (Subst -> M.Map String a) -> (Subst -> M.Map String a -> Subst)
+               -> (String -> a)
+               -> Subst -> String -> (Subst, String)
+substAnyBinder get set get_map set_map inj s x = (s' { subst_inscope = set iss (S.insert x' my_iss) }, x')
+  where
+    iss = subst_inscope s
+    my_iss = get iss
+    (s', x') | x `S.member` my_iss
+             , let x' = uniqAway x my_iss = (set_map s (M.insert x (inj x') (get_map s)), x')
+             | otherwise                  = (set_map s (M.delete x (get_map s)),          x)
+
+substBinder :: Subst -> Var -> (Subst, Var)
+substBinder = substAnyBinder fst (\iss set -> (set, snd iss)) subst_terms (\s m -> s { subst_terms = m }) Var
+
+substCoBinder :: Subst -> CoVar -> (Subst, CoVar)
+substCoBinder = substAnyBinder snd (\iss set -> (fst iss, set)) subst_coterms (\s m -> s { subst_coterms = m }) CoVar
+
+substVar :: Subst -> Var -> Term
+substVar s x = M.findWithDefault (Var x) x (subst_terms s)
+
+substCoVar :: Subst -> CoVar -> CoTerm
+substCoVar s a = M.findWithDefault (CoVar a) a (subst_coterms s)
+
+
+substTerm :: Subst -> Term -> Term
+substTerm subst m = case m of
+  Var x -> substVar subst x
+  Data con m -> Data con (substTerm subst m)
+  Tup ms -> Tup (map (substTerm subst) ms)
+  Not k -> Not (substCoTerm subst k)
+  Lam x m -> Lam x' (substTerm subst' m)
+    where (subst', x') = substBinder subst x
+  Bind s a -> Bind (substStmt subst' s) a'
+    where (subst', a') = substCoBinder subst a
+  Fix x m -> Fix x' (substTerm subst' m)
+    where (subst', x') = substBinder subst x
+
+substCoTerm :: Subst -> CoTerm -> CoTerm
+substCoTerm subst k = case k of
+  CoVar a -> substCoVar subst a
+  CoData alts -> CoData [(mb_con, substCoTerm subst k) | (mb_con, k) <- alts]
+  CoTup i k -> CoTup i (substCoTerm subst k)
+  CoNot m -> CoNot (substTerm subst m)
+  CoLam m k -> CoLam (substTerm subst m) (substCoTerm subst k)
+  CoBind x s -> CoBind x' (substStmt subst' s)
+    where (subst', x') = substBinder subst x
+
+substStmt :: Subst -> Stmt -> Stmt
+substStmt subst (m `Cut` k) = substTerm subst m `Cut` substCoTerm subst k
