@@ -1,0 +1,16 @@
+Cabal-Version:      >= 1.2
+Build-Type:         Simple
+Name:               dual-calculus
+Version:            0.1
+Maintainer:         Max Bolingbroke <batterseapower@hotmail.com>
+Homepage:           http://www.github.com/batterseapower/dual-calculus
+License:            BSD3
+License-File:       LICENSE
+Author:             Max Bolingbroke
+Synopsis:           An implementation of the dual calculus in Haskell
+Category:           Language
+
+Executable dual-calculus
+    Main-Is:        Main.hs
+    Build-Depends:  base >= 4 && < 5, prettyclass >= 1 && < 1.2, uniqueid >= 0.1.1 && < 0.2
+    Extensions:     TypeOperators, PatternGuards
