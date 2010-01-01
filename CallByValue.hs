@@ -8,7 +8,7 @@ import Data.Maybe
 
 step :: Stmt -> Maybe Stmt
  -- If we are cutting against a non-value we can evaluate inside, do so
-step (m `Cut` k) | Just (Just f, m) <- eval m = Just $ m `Cut` CoBind ecks (f (Var ecks) `Cut` k)
+step (m `Cut` k) | Just (Just f, m) <- eval m = Just $ m `Cut` CoBind wildEcks (f (Var wildEcks) `Cut` k)
  -- Two possibilities remain:
  --  1) We are cutting against a value
  --  2) We are cutting against a non-value we can't go inside: i.e. a bind

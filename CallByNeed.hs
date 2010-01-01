@@ -4,11 +4,12 @@ import CallByName   ( coeval )
 import CallByValue  ( value )
 import Substitution
 import Syntax
+import Utilities
 
 import Control.Arrow ( first, (***) )
 
-import Data.Unique.Id
 import Data.Maybe
+import Data.List
 
 
 step :: Stmt -> Maybe Stmt
@@ -17,7 +18,7 @@ step s = case cbneedInner emptyInScopeSet s of Just (Right s) -> Just s; _ -> No
 
 cbneedInner :: InScopeSet -> Stmt -> Maybe (Either Var Stmt)
  -- If we are cutting against a non-covalue we can evaluate inside, do so
-cbneedInner _ (m `Cut` k) | Just (Just f, k) <- coeval k = return $ Right $ Bind (m `Cut` f (CoVar alpha)) alpha `Cut` k
+cbneedInner _ (m `Cut` k) | Just (Just f, k) <- coeval k = return $ Right $ Bind (m `Cut` f (CoVar wildAlpha)) wildAlpha `Cut` k
  -- Two possibilities remain:
  --  1) We are cutting against a covalue
  --  2) We are cutting against a non-covalue we can't go inside: i.e. a cobind
@@ -37,8 +38,9 @@ cbneedInner iss (m `Cut` k@(CoBind x sk))
         -> return $ Left y
          -- Perhaps we can get away with just inlining part of the definition of x into the body -- just the bit that is already a value
          -- NB: important that we don't do this if the "value" is simply a variable, because then we don't make any progress!
-        | (Right m, floats) <- valueize wildIdSupply m
-        -> return $ Right $ floats `bindMany` substStmt (extendSubstTerm (emptySubst iss) x m) sk
+        | (Right m, floats) <- valueize (inScopeSetInfiniteTree "float" iss) m
+        , let iss' = foldl' extendInScopeSetVar iss (map fst floats)
+        -> return $ Right $ floats `bindMany` substStmt (extendSubstTerm (emptySubst iss') x m) sk
          -- Only remaining possibility is that m is a non-value we can't go inside, i.e. a bind
          -- In this case we evaluate under the bind, hoping to reduce m to a value
         | Bind sm a <- m
@@ -62,13 +64,17 @@ cbneedInner _ (Var x `Cut` _)   = return $ Left x
  --     NB: if we reach here have some sort of non-variable term to give to the system and we may halt
 cbneedInner _ (_ `Cut` CoVar "halt") = Nothing
 
+inScopeSetInfiniteTree :: String -> InScopeSet -> InfiniteTree String
+inScopeSetInfiniteTree base iss = filterInfiniteTree (\x -> not (coVarInInScopeSet iss x) && not (varInInScopeSet iss x)) (go 0)
+  where go n = Node (base ++ show n) (go $ n * 2) (go $ (n * 2) + 1)
+
 
 -- Invariant: valueize ids m == (Right m, floats) ==> value m && all (not . value . snd) floats
-valueize :: IdSupply -> Term -> (Either Var Term, [(Var, Term)])
+valueize :: InfiniteTree String -> Term -> (Either Var Term, [(Var, Term)])
 valueize ids (Data con m) = first (Right . Data con . injectValueize) $ valueize ids m
-valueize ids (Tup ms) = (Right . Tup . map injectValueize) *** concat $ unzip $ zipWith valueize (splitIdSupplyL ids) ms
+valueize ids (Tup ms) = (Right . Tup . map injectValueize) *** concat $ unzip $ zipWith valueize (splitInfiniteTree ids) ms
 valueize ids m | value m   = (Right m, [])
-               | otherwise = let x = show $ idFromSupply ids in (Left x, [(x, m)])
+               | otherwise = let x = tree_node ids in (Left x, [(x, m)])
 
 injectValueize :: Either Var Term -> Term
 injectValueize = either Var id

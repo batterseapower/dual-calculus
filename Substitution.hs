@@ -14,6 +14,12 @@ emptyInScopeSet :: InScopeSet
 emptyInScopeSet = (S.empty, S.empty)
 
 
+varInInScopeSet :: InScopeSet -> Var -> Bool
+varInInScopeSet = flip S.member . fst
+
+coVarInInScopeSet :: InScopeSet -> CoVar -> Bool
+coVarInInScopeSet = flip S.member . snd
+
 extendInScopeSetVar :: InScopeSet -> Var -> InScopeSet
 extendInScopeSetVar iss x = first (S.insert x) iss
 

@@ -9,7 +9,7 @@ import Data.Maybe
 
 step :: Stmt -> Maybe Stmt
  -- If we are cutting against a non-covalue we can evaluate inside, do so
-step (m `Cut` k) | Just (Just f, k) <- coeval k = Just $ Bind (m `Cut` f (CoVar alpha)) alpha `Cut` k
+step (m `Cut` k) | Just (Just f, k) <- coeval k = Just $ Bind (m `Cut` f (CoVar wildAlpha)) wildAlpha `Cut` k
  -- Two possibilities remain:
  --  1) We are cutting against a covalue
  --  2) We are cutting against a non-covalue we can't go inside: i.e. a cobind
@@ -50,6 +50,6 @@ covalue (CoBind x (Var y `Cut` k)) = covalue k && x == y -- NB: not strictly as 
 covalue (CoBind _ _) = False
 
  -- CBV Is Dual To CBN, Reloaded: Section 3, Proposition 4
-lam x m = Bind (Data "Left" (Not (CoBind x (Data "Right" m `Cut` CoVar alpha))) `Cut` CoVar alpha) alpha
+lam x m = Bind (Data "Left" (Not (CoBind x (Data "Right" m `Cut` CoVar wildAlpha))) `Cut` CoVar wildAlpha) wildAlpha
 colam m k = CoData [(Just "Left", CoNot m), (Just "Right", k)]
-app m n = Bind (m `Cut` (n `colam` CoVar alpha)) alpha
+app m n = Bind (m `Cut` (n `colam` CoVar wildAlpha)) wildAlpha

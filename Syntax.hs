@@ -46,9 +46,9 @@ instance Pretty Stmt where
         m `Cut` k -> prettyParen (prec >= 9) (pPrintPrec level 9 m <+> text "●" <+> pPrintPrec level 9 k)
 
 
-app m n = Bind (m `Cut` (n `CoLam` CoVar alpha)) alpha
-letin x m n = Bind (m `Cut` (CoBind x (n `Cut` CoVar alpha))) alpha
-letrecin x m n = Bind (Fix x m `Cut` (CoBind x (n `Cut` CoVar alpha))) alpha
+app m n = Bind (m `Cut` (n `CoLam` CoVar wildAlpha)) wildAlpha
+letin x m n = Bind (m `Cut` (CoBind x (n `Cut` CoVar wildAlpha))) wildAlpha
+letrecin x m n = Bind (Fix x m `Cut` (CoBind x (n `Cut` CoVar wildAlpha))) wildAlpha
 
 bindMany :: [(Var, Term)] -> Stmt -> Stmt
 bindMany binds s = foldr (\(x, m) s -> m `Cut` CoBind x s) s binds
@@ -58,9 +58,5 @@ bindMany binds s = foldr (\(x, m) s -> m `Cut` CoBind x s) s binds
 wildIdSupply :: IdSupply
 wildIdSupply = unsafePerformIO $ initIdSupply 'a'
 
-alpha, ecks :: String
-(alpha:ecks:_) = map anyVarName $ splitIdSupplyL wildIdSupply
-
-anyVarName :: IdSupply -> String
-anyVarName = show . idFromSupply
-
+wildAlpha, wildEcks :: String
+(wildAlpha:wildEcks:_) = map (show . idFromSupply) $ splitIdSupplyL wildIdSupply
