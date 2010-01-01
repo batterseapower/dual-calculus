@@ -19,7 +19,7 @@ step (Bind s a `Cut` k)             = {- trace (prettyShow ("SHAREABLE", k)) $ -
 step (Data con v `Cut` CoData alts) = Just $ v `Cut` head [k | (mb_con, k) <- alts, mb_con == Just con || isNothing mb_con]
 step (Tup vs `Cut` CoTup i k)       = Just $ (vs !! i) `Cut` k
 step (Not k `Cut` CoNot m)          = Just $ m `Cut` k
-step (Lam x m `Cut` CoLam n k)      = Just $ m `Cut` CoBind x (n `Cut` k)
+step (Lam x n `Cut` CoLam m k)      = Just $ m `Cut` CoBind x (n `Cut` k)
 step (v `Cut` CoBind x s)           = Just $ substStmt (termSubst x v) s
  -- We can't reduce if any one of these occurs:
  --  1) The term is a variable

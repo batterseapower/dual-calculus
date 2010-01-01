@@ -51,7 +51,7 @@ cbneedInner iss (m `Cut` k@(CoBind x sk))
 cbneedInner _   (Data con m `Cut` CoData alts) = return $ Right $ m `Cut` head [p | (mb_con, p) <- alts, mb_con == Just con || isNothing mb_con]
 cbneedInner _   (Tup ms `Cut` CoTup i p)       = return $ Right $ (ms !! i) `Cut` p
 cbneedInner _   (Not k `Cut` CoNot m)          = return $ Right $ m `Cut` k
-cbneedInner _   (Lam x m `Cut` CoLam n k)      = return $ Right $ m `Cut` CoBind x (n `Cut` k)
+cbneedInner _   (Lam x n `Cut` CoLam m k)      = return $ Right $ m `Cut` CoBind x (n `Cut` k)
 cbneedInner _   (Fix x m `Cut` p)              = return $ Right $ Fix x m `Cut` CoBind x (m `Cut` p)
 cbneedInner iss (Bind s a `Cut` p)             = return $ Right $ substStmt (extendSubstCoTerm (emptySubst iss) a p) s
  -- We can't reduce if any one of these occurs:

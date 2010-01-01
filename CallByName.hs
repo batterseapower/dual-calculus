@@ -20,7 +20,7 @@ step (m `Cut` CoBind x s)           = {- trace (prettyShow ("SHAREABLE", m)) $ -
 step (Data con m `Cut` CoData alts) = Just $ m `Cut` head [p | (mb_con, p) <- alts, mb_con == Just con || isNothing mb_con]
 step (Tup ms `Cut` CoTup i p)       = Just $ (ms !! i) `Cut` p
 step (Not k `Cut` CoNot m)          = Just $ m `Cut` k
-step (Lam x m `Cut` CoLam n k)      = Just $ m `Cut` CoBind x (n `Cut` k)
+step (Lam x n `Cut` CoLam m k)      = Just $ m `Cut` CoBind x (n `Cut` k)
 step (Fix x m `Cut` p)              = Just $ Fix x m `Cut` CoBind x (m `Cut` p)
 step (Bind s a `Cut` p)             = Just $ substStmt (coTermSubst a p) s
  -- We can't reduce if any one of these occurs:
