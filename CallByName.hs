@@ -28,8 +28,10 @@ step (Bind s a `Cut` p)             = Just $ substStmt (coTermSubst a p) s
  --  2) The coterm is a covariable
 step _ = Nothing
 
--- Invariant: coeval k == Just (_, l) ==> not (covalue l)
--- This prevents infinite loops in the normaliser: there is no point pulling out bare covariables, for example
+-- Invariants:
+--  coeval k == Just (_, l)       ==> not (covalue l)
+--  coeval k == Just (Nothing, l) ==> k == l
+--  coeval k == Just (Just f, l)  ==> k /= l && k == f l
 coeval :: CoTerm -> Maybe (Maybe (CoTerm -> CoTerm), CoTerm)
 coeval (CoData alts)
   | Just (remains, (mb_con, k)) <- uncons remains

@@ -9,6 +9,12 @@ import LambdaCalculus
 import Text.PrettyPrint.HughesPJClass
 
 
+-- TODO:
+--  * Prove call by need correct (or otherwise)
+--   # The definition for covalue and value may be incorrect: are cuts (V ● a).a really values in general, and not just at the top level?
+--  * Implement the strategy dual to call by need
+
+
 normalise :: (Stmt -> Maybe Stmt) -> Stmt -> [Stmt]
 normalise step s = s : case step s of
   Nothing -> []
@@ -67,6 +73,19 @@ dualExample2 = letin "id" (app (Lam "x" (Var "x")) (Lam "x" (Var "x")))
 --  (\x. x) ● (\x. x @ id.((id ● (id @ a1)).a1 ● halt))
 dualExample3 = Bind (Not (CoBind "res1" (Not (CoBind "res2" (Tup [Var "res1", Var "res2"] `Cut` CoVar "halt")) `Cut` CoVar "a")) `Cut` CoVar "a") "a"
                  `Cut` CoBind "x" (Tup [Tup [], Var "3"] `Cut` CoTup 1 (CoBind "res" (Var "x" `Cut` CoNot (Var "res"))))
+
+-- let russel = \u@(MkU p) -> p u in russel (MkU russel)
+--
+-- Based on the following example from the GHC users guide (http://www.haskell.org/ghc/docs/latest/html/users_guide/bugs.html):
+--  data U = MkU (U -> Bool)
+--
+--  russel :: U -> Bool
+--  russel u@(MkU p) = not $ p u
+--
+--  x :: Bool
+--  x = russel (MkU russel)
+dualExample4 = letin "russel" (Lam "u" (Bind (Var "u" `Cut` CoData [(Just "MkU", CoBind "russel'" (Var "russel'" `app` Var "u" `Cut` CoVar "wildalpha"))]) wildAlpha))
+                     (Var "russel" `app` Data "MkU" (Var "russel")) `Cut` CoVar "halt"
 
 dualExample1Main = do
      -- Just show what we're going to work on
