@@ -1,10 +1,6 @@
 module Syntax where
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
 import Data.Unique.Id
-import Data.Maybe
-import Debug.Trace
 
 import System.IO.Unsafe
 
@@ -47,25 +43,15 @@ instance Pretty CoTerm where
 
 instance Pretty Stmt where
     pPrintPrec level prec k = case k of
-        m `Cut` k      -> prettyParen (prec >= 9) (pPrintPrec level 9 m <+> text "●" <+> pPrintPrec level 9 k)
+        m `Cut` k -> prettyParen (prec >= 9) (pPrintPrec level 9 m <+> text "●" <+> pPrintPrec level 9 k)
 
 
-bindMany :: [(Var, Term)] -> Stmt -> Stmt
-bindMany []            s = s
-bindMany ((x, m):rest) s = m `Cut` CoBind x (bindMany rest s)
-
- -- CBV Is Dual To CBN, Reloaded: Section 3, Proposition 4
- -- NB: this is the call-by-name/need lambda abstraction, since I'm going to assume that reduction strategy in the supercompiler
-lam_prims x m = Bind (Data "Left" (Not (CoBind x (Data "Right" m `Cut` CoVar alpha))) `Cut` CoVar alpha) alpha
-colam_prims m k = CoData [(Just "Left", CoNot m), (Just "Right", k)]
-app_prims m n = Bind (m `Cut` (n `colam_prims` CoVar alpha)) alpha
-
-lam = Lam
-colam = CoLam
-
-app m n = Bind (m `Cut` (n `colam` CoVar alpha)) alpha
+app m n = Bind (m `Cut` (n `CoLam` CoVar alpha)) alpha
 letin x m n = Bind (m `Cut` (CoBind x (n `Cut` CoVar alpha))) alpha
 letrecin x m n = Bind (Fix x m `Cut` (CoBind x (n `Cut` CoVar alpha))) alpha
+
+bindMany :: [(Var, Term)] -> Stmt -> Stmt
+bindMany binds s = foldr (\(x, m) s -> m `Cut` CoBind x s) s binds
 
 
 {-# NOINLINE wildIdSupply #-}

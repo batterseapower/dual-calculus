@@ -6,14 +6,6 @@ import qualified CallByValue
 import Syntax
 import LambdaCalculus
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
-import Data.Unique.Id
-import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
-
 import Text.PrettyPrint.HughesPJClass
 
 
@@ -30,15 +22,17 @@ example2 = LetRec "map" (LamLam "f" $ LamLam "xs" $ Case (LamVar "xs") [(Just "N
                   (App (App (LamVar "map") (LamVar "inc")) $ App (App (LamVar "map") (LamVar "double")) (LamVar "input"))
 
 example3_term
-  = letin "f" (lam_prims "x" (Var "x"))
-              (Bind (app_prims (Var "f") (Tup []) `Cut`
-                    CoBind "r1" (app_prims (Var "f") (Var "2") `Cut`
+  = letin "f" (CallByName.lam "x" (Var "x"))
+              (Bind (CallByName.app (Var "f") (Tup []) `Cut`
+                    CoBind "r1" (CallByName.app (Var "f") (Var "2") `Cut`
                                 CoBind "r2" (Tup [Var "r1", Var "r2"] `Cut`
                                              CoVar"c"))) "c") 
 
 example3 = example3_term `Cut` CoVar "halt"
 
+
 main = do
+     -- Just show what we're going to work on
     header "Original"
     print $ pPrint example3
      -- Obtain the tuple from example3

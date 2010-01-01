@@ -5,15 +5,10 @@ import CallByValue  ( value )
 import Substitution
 import Syntax
 
-import Control.Arrow ( first, second, (&&&), (***) )
+import Control.Arrow ( first, (***) )
 
 import Data.Unique.Id
 import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
-
-import Text.PrettyPrint.HughesPJClass
 
 
 step :: Stmt -> Maybe Stmt
@@ -71,7 +66,7 @@ cbneedInner (_ `Cut` CoVar "halt") = Nothing
 -- Invariant: valueize ids m == (Right m, floats) ==> value m && all (not . value . snd) floats
 valueize :: IdSupply -> Term -> (Either Var Term, [(Var, Term)])
 valueize ids (Data con m) = first (Right . Data con . injectValueize) $ valueize ids m
-valueize ids m@(Tup ms) = (Right . Tup . map injectValueize) *** concat $ unzip $ zipWith valueize (splitIdSupplyL ids) ms
+valueize ids (Tup ms) = (Right . Tup . map injectValueize) *** concat $ unzip $ zipWith valueize (splitIdSupplyL ids) ms
 valueize ids m | value m   = (Right m, [])
                | otherwise = let x = show $ idFromSupply ids in (Left x, [(x, m)])
 

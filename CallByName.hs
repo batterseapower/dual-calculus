@@ -1,18 +1,10 @@
-module CallByName( step, coeval, covalue ) where
+module CallByName( step, coeval, covalue, lam, colam, CallByName.app ) where
 
 import Substitution
 import Syntax
 import Utilities
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
-import Data.Unique.Id
 import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
-
-import Text.PrettyPrint.HughesPJClass
 
 
 step :: Stmt -> Maybe Stmt
@@ -56,3 +48,8 @@ covalue (CoLam _ k) = covalue k
 covalue (CoBind x (Data _ (Var y) `Cut` k)) = covalue k && x == y
 covalue (CoBind x (Var y `Cut` k)) = covalue k && x == y -- NB: not strictly as per Wadlers definition, but saves some fiddling in the cbneed strategy
 covalue (CoBind _ _) = False
+
+ -- CBV Is Dual To CBN, Reloaded: Section 3, Proposition 4
+lam x m = Bind (Data "Left" (Not (CoBind x (Data "Right" m `Cut` CoVar alpha))) `Cut` CoVar alpha) alpha
+colam m k = CoData [(Just "Left", CoNot m), (Just "Right", k)]
+app m n = Bind (m `Cut` (n `colam` CoVar alpha)) alpha

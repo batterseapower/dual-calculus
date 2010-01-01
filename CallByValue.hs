@@ -3,15 +3,7 @@ module CallByValue( step, eval, value ) where
 import Substitution
 import Syntax
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
-import Data.Unique.Id
 import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
-
-import Text.PrettyPrint.HughesPJClass
 
 
 step :: Stmt -> Maybe Stmt
@@ -39,7 +31,7 @@ step _ = Nothing
 -- This prevents infinite loops in the normaliser: there is no point pulling out bare variables, for example
 eval :: Term -> Maybe (Maybe (Term -> Term), Term)
 eval (Data con m) = do (mb_f, m) <- eval m; return (Just $ Data con . fromMaybe id mb_f, m)
-eval m@(Tup ms) | (vs, m:ms) <- span value ms = do (mb_f, m) <- eval m; return (Just $ \m -> Tup (vs ++ fromMaybe id mb_f m : ms), m)
+eval (Tup ms) | (vs, m:ms) <- span value ms = do (mb_f, m) <- eval m; return (Just $ \m -> Tup (vs ++ fromMaybe id mb_f m : ms), m)
 eval m | value m   = Nothing
        | otherwise = Just (Nothing, m)
 

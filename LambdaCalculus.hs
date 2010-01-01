@@ -2,13 +2,7 @@ module LambdaCalculus where
 
 import Syntax
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
 import Data.Unique.Id
-import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
 
 import Text.PrettyPrint.HughesPJClass
 
@@ -22,14 +16,14 @@ instance Pretty LamTerm where
         App t1 t2      -> prettyParen (prec >= 9) (pPrintPrec level 0 t1 <+> pPrintPrec level 9 t2)
         Let x t1 t2    -> prettyParen (prec >= 9) (text "let"    <+> text x <+> text "=" <+> pPrintPrec level 0 t1 $$ text "in" <+> pPrintPrec level 0 t2)
         LetRec x t1 t2 -> prettyParen (prec >= 9) (text "letrec" <+> text x <+> text "=" <+> pPrintPrec level 0 t1 $$ text "in" <+> pPrintPrec level 0 t2)
-        Case t alts    -> prettyParen (prec >= 9) (text "case" <+> pPrintPrec level 0 t <+> text "of" $$ nest 2 (vcat $ [hang (maybe (text "_") text mb_con <+> text "->") 2 (pPrintPrec level 0 t) | (mb_con, bs, t) <- alts]))
+        Case t alts    -> prettyParen (prec >= 9) (text "case" <+> pPrintPrec level 0 t <+> text "of" $$ nest 2 (vcat $ [hang (maybe (text "_") text mb_con <+> fsep (map text bs) <+> text "->") 2 (pPrintPrec level 0 t) | (mb_con, bs, t) <- alts]))
 
 
 -- Investigations on the Dual Calculus, Nikos Tzevelekos: Definition 1.6, p7
 dualize :: IdSupply -> LamTerm -> Term
-dualize ids (LamVar x) = Var x
-dualize ids (LamLam x t)  = lam x (dualize ids t)
-dualize ids (App t1 t2) = Bind (dualize ids2 t1 `Cut` (dualize ids3 t2 `colam` CoVar a)) a
+dualize _   (LamVar x) = Var x
+dualize ids (LamLam x t) = Lam x (dualize ids t)
+dualize ids (App t1 t2) = Bind (dualize ids2 t1 `Cut` (dualize ids3 t2 `CoLam` CoVar a)) a
   where (ids1, ids') = splitIdSupply ids
         (ids2, ids3) = splitIdSupply ids'
         a = "$a" ++ show (idFromSupply ids1)

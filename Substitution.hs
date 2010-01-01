@@ -2,16 +2,6 @@ module Substitution where
 
 import Syntax
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
-import Data.Unique.Id
-import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
-
-import Text.PrettyPrint.HughesPJClass
-
 
 -- FIXME: this is all so, so wrong. Must rename binders if we want to ensure no capture of FVs of thing being substituted
 -- It will work if the FVs of the thing being substituted are all fresh

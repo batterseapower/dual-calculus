@@ -1,15 +1,5 @@
 module Utilities where
 
-import Control.Arrow ( first, second, (&&&), (***) )
-
-import Data.Unique.Id
-import Data.Maybe
-import Debug.Trace
-
-import System.IO.Unsafe
-
-import Text.PrettyPrint.HughesPJClass
-
 
 uncons [] = Nothing
 uncons xs = Just (init xs, last xs)
