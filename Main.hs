@@ -45,8 +45,8 @@ dualExample1 = dualExample1Term `Cut` CoVar "halt"
 -- let id = (\x. x) (\x. x)
 -- in id id
 --
--- Useful for showing the difference between call by name and call by need,
--- since call by need evaluates the application in "id" only once
+-- Useful for showing the difference between call by name and call by need
+-- (or call by value), since the latter two evaluate the application in "id" only once
 dualExample2 = letin "id" (app (Lam "x" (Var "x")) (Lam "x" (Var "x")))
                           (app (Var "id") (Var "id")) `Cut` CoVar "halt"
 
@@ -71,6 +71,8 @@ dualExample2Main = do
     mapM_ (print . pPrint) $ normalise CallByName.step dualExample2
     header "Call by need"
     mapM_ (print . pPrint) $ normalise CallByNeed.step dualExample2
+    header "Call by value"
+    mapM_ (print . pPrint) $ normalise CallByValue.step dualExample2
 
 main = dualExample2Main
 
