@@ -42,7 +42,14 @@ cbneedInner iss (m `Cut` k@(CoBind x sk))
         , let iss' = foldl' extendInScopeSetVar iss (map fst floats)
         -> return $ Right $ floats `bindMany` substStmt (extendSubstTerm (emptySubst iss') x m) sk
          -- Only remaining possibility is that m is a non-value we can't go inside, i.e. a bind
-         -- In this case we evaluate under the bind, hoping to reduce m to a value
+         -- In this case we evaluate under the bind, hoping to reduce m to a value.
+         --
+         -- This seems to work in practice. What we need to show to prove that this works in general is
+         -- that if we can't make progress by evaluating the non-value under its binding, we couldn't
+         -- make progress if we actually went ahead and did the substitution.
+         --
+         -- The reason that this is important is that otherwise the call by need strategy would get stuck
+         -- more often than the call by name one.
         | Bind sm a <- m
         -> do resm <- cbneedInner (extendInScopeSetCoVar iss a) sm
               case resm of Left y   -> return $ Left y

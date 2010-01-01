@@ -50,6 +50,24 @@ dualExample1 = dualExample1Term `Cut` CoVar "halt"
 dualExample2 = letin "id" (app (Lam "x" (Var "x")) (Lam "x" (Var "x")))
                           (app (Var "id") (Var "id")) `Cut` CoVar "halt"
 
+-- ([res1.([res2.((res1, res2) ● halt)]~ ● a)]~ ● a).a ● x.(((), 3) ● 1 !! res.(x ● ~(res)))
+--
+-- An example that shows the difference between call by value and the strategy
+-- dual to call by need. Because the coterm bound to "a" is used non-linearly,
+-- we have the opportunity to force it to perform the cut of Tup against CoTup
+-- more than once, which leads to inefficiency.
+--
+-- The reason that this strategy has not recieved more attention is that in
+-- lambda calculus, the coterm (continuation) is typically used linearly, so
+-- there is little to be gained by memoization, even though you see CBV reductions
+-- like the following that at first glance seem to introduce work duplication:
+--
+--  ((\x. x) ● (\x. x @ a1)).a1 ● id.((id ● (id @ a1)).a1 ● halt)
+-- -->
+--  (\x. x) ● (\x. x @ id.((id ● (id @ a1)).a1 ● halt))
+dualExample3 = Bind (Not (CoBind "res1" (Not (CoBind "res2" (Tup [Var "res1", Var "res2"] `Cut` CoVar "halt")) `Cut` CoVar "a")) `Cut` CoVar "a") "a"
+                 `Cut` CoBind "x" (Tup [Tup [], Var "3"] `Cut` CoTup 1 (CoBind "res" (Var "x" `Cut` CoNot (Var "res"))))
+
 dualExample1Main = do
      -- Just show what we're going to work on
     header "Original"
@@ -64,17 +82,17 @@ dualExample1Main = do
     header "Call by need, first component"
     mapM_ (print . pPrint) $ normalise CallByNeed.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
 
-dualExample2Main = do
+exampleMain example = do
     header "Original"
-    print $ pPrint dualExample2
+    print $ pPrint example
     header "Call by name"
-    mapM_ (print . pPrint) $ normalise CallByName.step dualExample2
+    mapM_ (print . pPrint) $ normalise CallByName.step example
     header "Call by need"
-    mapM_ (print . pPrint) $ normalise CallByNeed.step dualExample2
+    mapM_ (print . pPrint) $ normalise CallByNeed.step example
     header "Call by value"
-    mapM_ (print . pPrint) $ normalise CallByValue.step dualExample2
+    mapM_ (print . pPrint) $ normalise CallByValue.step example
 
-main = dualExample2Main
+main = exampleMain dualExample3
 
 header s = putStrLn $ unwords [replicate 10 '=', s, replicate 10 '=']
 
