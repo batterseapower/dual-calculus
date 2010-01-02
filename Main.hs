@@ -87,6 +87,12 @@ dualExample3 = Bind (Not (CoBind "res1" (Not (CoBind "res2" (Tup [Var "res1", Va
 dualExample4 = letin "russel" (Lam "u" (Bind (Var "u" `Cut` CoData [(Just "MkU", CoBind "russel'" (Var "russel'" `app` Var "u" `Cut` CoVar "wildalpha"))]) wildAlpha))
                      (Var "russel" `app` Data "MkU" (Var "russel")) `Cut` CoVar "halt"
 
+-- let ones = 1 : ones in case ones of x:_ -> x
+--
+-- Useful for testing the behaviour of fixed points.
+dualExample5 = letrecin "ones" (Data "Cons" $ Tup [Var "1", Var "ones"])
+                        (Bind (Var "ones" `Cut` CoData [(Just "Cons", CoTup 0 (CoVar "a"))]) "a") `Cut` CoVar "halt"
+
 dualExample1Main = do
      -- Just show what we're going to work on
     header "Original"
@@ -111,7 +117,7 @@ exampleMain example = do
     header "Call by value"
     mapM_ (print . pPrint) $ normalise CallByValue.step example
 
-main = exampleMain dualExample3
+main = exampleMain dualExample5
 
 header s = putStrLn $ unwords [replicate 10 '=', s, replicate 10 '=']
 
