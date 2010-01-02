@@ -20,6 +20,30 @@ type Bind = (Var, Term)
 type CoBind = (CoVar, CoTerm)
 
 
+-- Note [Lambdas]
+-- ~~~~~~~~~~~~~~
+--
+-- Lambdas and colambdas are strictly speaking unnecessary, because you can always encode them away by using a
+-- evaluation-strategy specific means. However, they are sure as hell easier to read than their encodings!
+--
+-- If we avoid using the encoding, you can drop Not and CoNot when compiling a language without first class
+-- continuations.
+
+-- Note [Fixpoints]
+-- ~~~~~~~~~~~~~~~~
+--
+-- Because I allow recursive data with contravariant occurences, the fixed point operators can be
+-- encoded away, analagously to how you can encode away lambdas and applications. The encoding
+-- of fix is as follows:
+--   fix x. M = ((\u. (u ● case MkU -> p.((p ● u @ c).c ● x.(M ● b))).b) ● russel.(russel ● (MkU russel @ a))).a
+--
+-- Where we have:
+--   data U a = MkU (U a -> a)
+--
+-- Note that we *might* be able to clean up this combinator a bit if we expanded the definition of lambda and @,
+-- and then reduced.
+
+
 dot = text "."
 
 instance Pretty Term where
