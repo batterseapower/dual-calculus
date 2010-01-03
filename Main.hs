@@ -6,6 +6,8 @@ import qualified CallByValue
 import Syntax
 import LambdaCalculus
 
+import Control.Monad
+
 import Text.PrettyPrint.HughesPJClass
 
 
@@ -93,31 +95,52 @@ dualExample4 = letin "russel" (Lam "u" (Bind (Var "u" `Cut` CoData [(Just "MkU",
 dualExample5 = letrecin "ones" (Data "Cons" $ Tup [Var "1", Var "ones"])
                         (Bind (Var "ones" `Cut` CoData [(Just "Cons", CoTup 0 (CoVar "a"))]) "a") `Cut` CoVar "halt"
 
+-- letrec f = case f 1 of MkU x -> x
+-- in f 2
+--
+-- Useful for testing the behaviour of black holes.
+dualExample6 = letrecin "f" (Bind (app (Var "f") (Var "1") `Cut` CoData [(Just "MkU", CoVar "a")]) "a")
+                        (app (Var "f") (Var "2")) `Cut` CoVar "halt"
+
 dualExample1Main = do
      -- Just show what we're going to work on
     header "Original"
     print $ pPrint dualExample1
      -- Obtain the tuple from example1
     header "Call by name"
-    mapM_ (print . pPrint) $ normalise CallByName.step dualExample1
+    printNormalise CallByName.step dualExample1
      -- Place demand on the first component of that tuple
     header "Call by name, first component"
-    mapM_ (print . pPrint) $ normalise CallByName.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
+    printNormalise CallByName.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
      -- Right, what does that look like in need?
     header "Call by need, first component"
-    mapM_ (print . pPrint) $ normalise CallByNeed.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
+    printNormalise CallByNeed.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
 
 exampleMain example = do
     header "Original"
     print $ pPrint example
     header "Call by name"
-    mapM_ (print . pPrint) $ normalise CallByName.step example
+    printNormalise CallByName.step example
     header "Call by need"
-    mapM_ (print . pPrint) $ normalise CallByNeed.step example
+    printNormalise CallByNeed.step example
     header "Call by value"
-    mapM_ (print . pPrint) $ normalise CallByValue.step example
+    printNormalise CallByValue.step example
 
-main = exampleMain dualExample5
+printNormalise step s = do
+    mapM_ (print . pPrint) steps
+    when (length steps >= 20) $ putStrLn "Terminated: number of steps exceeds 20"
+  where steps = take 20 $ normalise step s
+
+main = forM_ [(False, "Primitive lambdas", dualExample1Main),
+              (False, "Call-by-name vs Call-by-need", exampleMain dualExample2),
+              (False, "Call-by-value vs Call-by-coneed", exampleMain dualExample3),
+              (False, "Russel non-termination", exampleMain dualExample4),
+              (True,  "Fixed points", exampleMain dualExample5),
+              (False, "Black holes", exampleMain dualExample6)
+             ] $ \(enabled, title, example) -> when enabled $ do
+        header title
+        example
+        putStrLn ""
 
 header s = putStrLn $ unwords [replicate 10 '=', s, replicate 10 '=']
 
