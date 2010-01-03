@@ -42,6 +42,8 @@ type CoBind = (CoVar, CoTerm)
 --
 -- Note that we *might* be able to clean up this combinator a bit if we expanded the definition of lambda and @,
 -- and then reduced.
+--
+-- One issue with this combinator is that it doesn't preserve sharing of M in call by need.
 
 
 dot = text "."
