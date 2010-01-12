@@ -1,4 +1,4 @@
-module CallByName( step, coeval, covalue, lam, colam, CallByName.app ) where
+module CallByName.Evaluate( step, coeval, covalue, lam, colam, CallByName.Evaluate.app ) where
 
 import Substitution
 import Syntax
@@ -38,6 +38,7 @@ coeval (CoData alts)
   = do (mb_f, k) <- coeval k; return (Just $ \k -> CoData (remains ++ [(mb_con, fromMaybe id mb_f k)] ++ covalues), k)
   where (remains, covalues) = spanRev (covalue . snd) alts
 coeval (CoTup i k) = do (mb_f, k) <- coeval k; return (Just $ CoTup i . fromMaybe id mb_f, k)
+coeval (CoLam m k) = do (mb_f, k) <- coeval k; return (Just $ CoLam m . fromMaybe id mb_f, k)
 coeval k | covalue k = Nothing
          | otherwise = Just (Nothing, k)
 
@@ -47,8 +48,7 @@ covalue (CoData alts) = all (covalue . snd) alts
 covalue (CoTup _ k) = covalue k
 covalue (CoNot _) = True
 covalue (CoLam _ k) = covalue k
-covalue (CoBind x (Data _ (Var y) `Cut` k)) = covalue k && x == y
-covalue (CoBind x (Var y `Cut` k)) = covalue k && x == y -- NB: not strictly as per Wadlers definition, but saves some fiddling in the cbneed strategy
+--covalue (CoBind x (Data _ (Var y) `Cut` k)) = covalue k && x == y
 covalue (CoBind _ _) = False
 
  -- CBV Is Dual To CBN, Reloaded: Section 3, Proposition 4

@@ -1,8 +1,8 @@
 module Main where
 
-import qualified CallByName
-import qualified CallByNeed
-import qualified CallByValue
+import qualified CallByName.Evaluate as CallByName
+import qualified CallByNeed.Evaluate as CallByNeed
+import qualified CallByValue.Evaluate as CallByValue
 import Syntax
 import LambdaCalculus
 
@@ -102,6 +102,49 @@ dualExample5 = letrecin "ones" (Data "Cons" $ Tup [Var "1", Var "ones"])
 dualExample6 = letrecin "f" (Bind (app (Var "f") (Var "1") `Cut` CoData [(Just "MkU", CoVar "a")]) "a")
                         (app (Var "f") (Var "2")) `Cut` CoVar "halt"
 
+{-
+-- See http://www.mail-archive.com/haskell@haskell.org/msg14044.html, and in particular http://www.mail-archive.com/haskell@haskell.org/msg14047.html
+-- (define (make-cell)           ; Alan Bawden, 1989
+-- (call-with-current-continuation
+--   (lambda (return-from-make-cell)
+--     (letrec ((state
+--                (call-with-current-continuation
+--                  (lambda (return-new-state)
+--                    (return-from-make-cell
+--                      (lambda (op)
+--                        (case op
+--                          ((set)
+--                           (lambda (value)
+--                             (call-with-current-continuation
+--                               (lambda (return-from-access)
+--                                 (return-new-state
+--                                   (list value return-from-access))))))
+--                          ((get) (car state)))))))))
+--       ((cadr state) 'done)))))
+dualExample7
+  = letin "fst" (Lam "pair" (Bind (Var "pair" `Cut` CoTup 0 (CoVar "a")) "a")) $
+    letin "snd" (Lam "pair" (Bind (Var "pair" `Cut` CoTup 1 (CoVar "b")) "b")) $
+    letin "makecell" (callcc (Lam "return-from-make-call"
+                                (letrecin "state" (callcc (Lam "return-new-state"
+                                                              (Var "return-from-make-call" `app` Tup [Lam "value"
+                                                                                                        (callcc (Lam "return-from-access"
+                                                                                                                    (Var "return-new-state" `app` Tup [Var "value", Var "return-from-access"]))),
+                                                                                                      Var "fst" `app` Var "state"]))) $
+                                ((Var "snd" `app` Var "state") {- `app` Tup [] -})))) $
+    letin "c" (Var "makecell") $
+    Bind (Var "c" `Cut` CoTup 0 (CoBind "setter" (Var "setter" `Cut` (CoLam (Data "Foo" (Tup [])) (CoBind "_" (Var "c" `Cut` CoTup 1 (CoVar "a"))))))) "a"
+  
+  
+  -- Tup [Bind (Var "meh" `Cut` CoVar "halt2") "_", Var "foo"] `Cut` CoBind "x" (Var "x" `Cut` CoTup 1 (CoVar "halt1"))
+  -- Tup [Bind (Var "meh" `Cut` CoVar "halt2") "_", Var "foo"] `Cut` CoBind "x" (Var "x" `Cut` CoTup 1 (CoBind "y" (Var "y" `Cut` CoTup 1 (CoVar "halt1"))))
+  -- Tup [Tup[Var "a", Var "b"], Var "c"] `Cut` CoTup 0 (CoBind "a" (Var "a" `Cut` CoTup 0 (CoBind "x" (Var "a" `Cut` CoTup 1 (CoBind "y" (Var "done" `Cut` CoVar "halt"))))))
+
+-- dualExample8 = callcc (Lam "return" (Bind (Tup [Var "1", Var "2"] `Cut` CoBind "t" ((Var "return" `app` Tup [Var "1", Var "2"]) `Cut` CoTup 0 (CoBind "t2" (Var "t" `Cut` CoVar "a"))) "a")))
+
+callcc :: Term -> Term
+callcc m = Bind ((m `app` (Lam "v" $ Bind (Var "v" `Cut` CoVar "a-captured") "_")) `Cut` CoVar "a-captured") "a-captured"
+-}
+
 dualExample1Main = do
      -- Just show what we're going to work on
     header "Original"
@@ -128,11 +171,12 @@ exampleMain example = do
 
 printNormalise step s = do
     mapM_ (print . pPrint) steps
-    when (length steps >= 20) $ putStrLn "Terminated: number of steps exceeds 20"
-  where steps = take 20 $ normalise step s
+    when (length steps >= lIMIT) $ putStrLn $ "Terminated: number of steps exceeds " ++ show lIMIT
+  where steps = take lIMIT $ normalise step s
+        lIMIT = 1000
 
 main = forM_ [(False, "Primitive lambdas", dualExample1Main),
-              (False, "Call-by-name vs Call-by-need", exampleMain dualExample2),
+              (True, "Call-by-name vs Call-by-need", exampleMain dualExample2),
               (False, "Call-by-value vs Call-by-coneed", exampleMain dualExample3),
               (False, "Russel non-termination", exampleMain dualExample4),
               (True,  "Fixed points", exampleMain dualExample5),

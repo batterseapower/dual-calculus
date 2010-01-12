@@ -1,4 +1,4 @@
-module CallByValue( step, eval, value ) where
+module CallByValue.Evaluate( step, eval, value ) where
 
 import Substitution
 import Syntax
@@ -42,6 +42,5 @@ value (Tup ms) = all value ms
 value (Not _) = True
 value (Lam _ _) = True
 value (Fix _ _) = False
-value (Bind (m `Cut` CoTup _ (CoVar b)) a) = value m && a == b
-value (Bind (m `Cut` CoVar b) a) = value m && a == b -- NB: not strictly as per Wadler, as for covalue
+--value (Bind (m `Cut` CoTup _ (CoVar b)) a) = value m && a == b
 value (Bind _ _) = False
