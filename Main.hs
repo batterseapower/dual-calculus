@@ -1,10 +1,11 @@
 module Main where
 
 import qualified CallByName.Evaluate as CallByName
-import qualified CallByNeed.Evaluate as CallByNeed
+-- FIXME: until I can work out how to do it properly:
+-- import qualified CallByNeed.Evaluate as CallByNeed
 import qualified CallByValue.Evaluate as CallByValue
+import Core
 import Syntax
-import LambdaCalculus
 
 import Control.Monad
 
@@ -26,15 +27,15 @@ normalise step s = s : case step s of
 -- letrec ones = one : ones in ones
 --
 -- Simple demonstration of infinite data
-lamExample1 = LetRec "ones" (App (App (LamVar "Cons") (LamVar "one")) (LamVar "ones"))
-                     (LamVar "ones")
+lamExample1 = CoreLetRec "ones" (CoreApp (CoreApp (CoreVar "Cons") (CoreVar "one")) (CoreVar "ones")) $
+              CoreVar "ones"
 
 -- let map = \f. \xs. case xs of Nil -> Nil_wrap; Cons y ys -> Cons_wrap (f y) (map f ys)
 -- in map inc (map double input)
 --
 -- Advanced example for supercompilation experiments
-lamExample2 = LetRec "map" (LamLam "f" $ LamLam "xs" $ Case (LamVar "xs") [(Just "Nil", [], LamVar "Nil_wrap"), (Just "Cons", ["y", "ys"], App (App (LamVar "Cons_wrap") (App (LamVar "f") (LamVar "y"))) $ App (App (LamVar "map") (LamVar "f")) (LamVar "ys"))])
-                     (App (App (LamVar "map") (LamVar "inc")) $ App (App (LamVar "map") (LamVar "double")) (LamVar "input"))
+lamExample2 = CoreLetRec "map" (CoreLam "f" $ CoreLam "xs" $ CoreCase (CoreVar "xs") ("_", CoreVar "Nil_wrap") ("cons", CoreSelect (CoreVar "cons") Fst "y" $ CoreSelect (CoreVar "cons") Snd "ys" $ CoreApp (CoreApp (CoreVar "Cons_wrap") (CoreApp (CoreVar "f") (CoreVar "y"))) $ CoreApp (CoreApp (CoreVar "map") (CoreVar "f")) (CoreVar "ys"))) $
+              CoreApp (CoreApp (CoreVar "map") (CoreVar "inc")) $ CoreApp (CoreApp (CoreVar "map") (CoreVar "double")) (CoreVar "input")
 
 
 -- let f = \x. x
@@ -43,10 +44,10 @@ lamExample2 = LetRec "map" (LamLam "f" $ LamLam "xs" $ Case (LamVar "xs") [(Just
 -- Useful for getting a feel of how lambdas work in their primitive form
 dualExample1Term
   = letin "f" (CallByName.lam "x" (Var "x"))
-              (Bind (CallByName.app (Var "f") (Tup []) `Cut`
+              (Bind (CallByName.app (Var "f") (Var "()") `Cut`
                     CoBind "r1" (CallByName.app (Var "f") (Var "2") `Cut`
-                                CoBind "r2" (Tup [Var "r1", Var "r2"] `Cut`
-                                             CoVar"c"))) "c") 
+                                CoBind "r2" (Tup (Var "r1") (Var "r2") `Cut`
+                                             CoVar "c"))) "c") 
 
 dualExample1 = dualExample1Term `Cut` CoVar "halt"
 
@@ -73,33 +74,26 @@ dualExample2 = letin "id" (app (Lam "x" (Var "x")) (Lam "x" (Var "x")))
 --  ((\x. x) ● (\x. x @ a1)).a1 ● id.((id ● (id @ a1)).a1 ● halt)
 -- -->
 --  (\x. x) ● (\x. x @ id.((id ● (id @ a1)).a1 ● halt))
-dualExample3 = Bind (Not (CoBind "res1" (Not (CoBind "res2" (Tup [Var "res1", Var "res2"] `Cut` CoVar "halt")) `Cut` CoVar "a")) `Cut` CoVar "a") "a"
-                 `Cut` CoBind "x" (Tup [Tup [], Var "3"] `Cut` CoTup 1 (CoBind "res" (Var "x" `Cut` CoNot (Var "res"))))
+dualExample3 = Bind (Not (CoBind "res1" (Not (CoBind "res2" (Tup (Var "res1") (Var "res2") `Cut` CoVar "halt")) `Cut` CoVar "a")) `Cut` CoVar "a") "a"
+                 `Cut` CoBind "x" (Tup (Var "()") (Var "3") `Cut` CoTup Snd (CoBind "res" (Var "x" `Cut` CoNot (Var "res"))))
 
--- let russel = \u@(MkU p) -> p u in russel (MkU russel)
+-- let fix = \x -> x x in fix fix
 --
--- Based on the following example from the GHC users guide (http://www.haskell.org/ghc/docs/latest/html/users_guide/bugs.html):
---  data U = MkU (U -> Bool)
---
---  russel :: U -> Bool
---  russel u@(MkU p) = not $ p u
---
---  x :: Bool
---  x = russel (MkU russel)
-dualExample4 = letin "russel" (Lam "u" (Bind (Var "u" `Cut` CoData [(Just "MkU", CoBind "russel'" (Var "russel'" `app` Var "u" `Cut` CoVar "wildalpha"))]) wildAlpha))
-                     (Var "russel" `app` Data "MkU" (Var "russel")) `Cut` CoVar "halt"
+-- Obviously not well-typed in the standard rules!
+dualExample4 = letin "fix" (CallByName.lam "x" $ Var "x" `CallByName.app` Var "x")
+                     (Var "fix" `CallByName.app` Var "fix") `Cut` CoVar "halt"
 
 -- let ones = 1 : ones in case ones of x:_ -> x
 --
 -- Useful for testing the behaviour of fixed points.
-dualExample5 = letrecin "ones" (Data "Cons" $ Tup [Var "1", Var "ones"])
-                        (Bind (Var "ones" `Cut` CoData [(Just "Cons", CoTup 0 (CoVar "a"))]) "a") `Cut` CoVar "halt"
+dualExample5 = letrecin "ones" (Data (Tup (Var "1") (Var "ones")) Inr)
+                        (Bind (Var "ones" `Cut` CoData (CoVar "a") (CoTup Fst (CoVar "a"))) "a") `Cut` CoVar "halt"
 
--- letrec f = case f 1 of MkU x -> x
+-- letrec f = select f 1 !! fst x -> x
 -- in f 2
 --
 -- Useful for testing the behaviour of black holes.
-dualExample6 = letrecin "f" (Bind (app (Var "f") (Var "1") `Cut` CoData [(Just "MkU", CoVar "a")]) "a")
+dualExample6 = letrecin "f" (Bind (app (Var "f") (Var "1") `Cut` CoTup Fst (CoVar "a")) "a")
                         (app (Var "f") (Var "2")) `Cut` CoVar "halt"
 
 {-
@@ -154,18 +148,18 @@ dualExample1Main = do
     printNormalise CallByName.step dualExample1
      -- Place demand on the first component of that tuple
     header "Call by name, first component"
-    printNormalise CallByName.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
+    printNormalise CallByName.step $ dualExample1Term `Cut` CoTup Fst (CoVar "halt")
      -- Right, what does that look like in need?
-    header "Call by need, first component"
-    printNormalise CallByNeed.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
+    --header "Call by need, first component"
+    --printNormalise CallByNeed.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
 
 exampleMain example = do
     header "Original"
     print $ pPrint example
     header "Call by name"
     printNormalise CallByName.step example
-    header "Call by need"
-    printNormalise CallByNeed.step example
+    --header "Call by need"
+    --printNormalise CallByNeed.step example
     header "Call by value"
     printNormalise CallByValue.step example
 

@@ -83,8 +83,8 @@ substCoVar s a = M.findWithDefault (CoVar a) a (subst_coterms s)
 substTerm :: Subst -> Term -> Term
 substTerm subst m = case m of
   Var x -> substVar subst x
-  Data con m -> Data con (substTerm subst m)
-  Tup ms -> Tup (map (substTerm subst) ms)
+  Data m lr -> Data (substTerm subst m) lr
+  Tup m n -> Tup (substTerm subst m) (substTerm subst n)
   Not k -> Not (substCoTerm subst k)
   Lam x m -> Lam x' (substTerm subst' m)
     where (subst', x') = substBinder subst x
@@ -96,7 +96,7 @@ substTerm subst m = case m of
 substCoTerm :: Subst -> CoTerm -> CoTerm
 substCoTerm subst k = case k of
   CoVar a -> substCoVar subst a
-  CoData alts -> CoData [(mb_con, substCoTerm subst k) | (mb_con, k) <- alts]
+  CoData k l -> CoData (substCoTerm subst k) (substCoTerm subst l)
   CoTup i k -> CoTup i (substCoTerm subst k)
   CoNot m -> CoNot (substTerm subst m)
   CoLam m k -> CoLam (substTerm subst m) (substCoTerm subst k)
