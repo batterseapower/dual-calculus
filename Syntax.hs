@@ -10,12 +10,12 @@ import Text.PrettyPrint.HughesPJClass
 type Var = String
 type CoVar = String
 
-data InlInr = Inl | Inr
-data FstSnd = Fst | Snd
+data InlInr = Inl | Inr deriving (Eq)
+data FstSnd = Fst | Snd deriving (Eq)
 
-data Term   = Var Var     | Data Term InlInr      | Tup Term Term       | Not CoTerm | Lam Var Term      | Bind Stmt CoVar | Fix Var Term
-data CoTerm = CoVar CoVar | CoData CoTerm CoTerm  | CoTup FstSnd CoTerm | CoNot Term | CoLam Term CoTerm | CoBind Var Stmt -- | CoFix CoTerm CoVar
-data Stmt   = Term `Cut` CoTerm
+data Term   = Var Var     | Data Term InlInr      | Tup Term Term       | Not CoTerm | Lam Var Term      | Bind Stmt CoVar | Fix Var Term             deriving (Eq)
+data CoTerm = CoVar CoVar | CoData CoTerm CoTerm  | CoTup FstSnd CoTerm | CoNot Term | CoLam Term CoTerm | CoBind Var Stmt {- | CoFix CoTerm CoVar -} deriving (Eq)
+data Stmt   = Term `Cut` CoTerm deriving (Eq)
 
 type Bind = (Var, Term)
 type CoBind = (CoVar, CoTerm)
@@ -55,13 +55,19 @@ lambda = text "\\"
 fix = text "fix"
 angles d = text "<" <> d <> text ">"
 
+instance Show InlInr where show = show . pPrint
+
 instance Pretty InlInr where
     pPrint Inl = text "inl"
     pPrint Inr = text "inr"
 
+instance Show FstSnd where show = show . pPrint
+
 instance Pretty FstSnd where
     pPrint Fst = text "fst"
     pPrint Snd = text "snd"
+
+instance Show Term where show = show . pPrint
 
 instance Pretty Term where
     pPrintPrec level prec m = case m of
@@ -73,6 +79,8 @@ instance Pretty Term where
         Bind s a  -> parens (pPrintPrec level 0 s) <> dot <> text a
         Fix x m   -> fix <+> text x <> dot <> parens (pPrintPrec level 0 m)
 
+instance Show CoTerm where show = show . pPrint
+
 instance Pretty CoTerm where
     pPrintPrec level prec k = case k of
         CoVar a    -> text a
@@ -81,6 +89,8 @@ instance Pretty CoTerm where
         CoNot m    -> dnot <> parens (pPrintPrec level 0 m)
         CoLam m k  -> prettyParen (prec >= 9) (pPrintPrec level 0 m <+> at <+> pPrintPrec level 0 k)
         CoBind x s -> text x <> dot <> parens (pPrintPrec level 0 s)
+
+instance Show Stmt where show = show . pPrint
 
 instance Pretty Stmt where
     pPrintPrec level prec k = case k of

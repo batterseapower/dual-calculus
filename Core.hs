@@ -12,18 +12,25 @@ data Core = CoreVar Var
           | CoreApp Core Core
           | CoreLet Var Core Core
           | CoreLetRec Var Core Core
+          | CoreData InlInr Core
           | CoreCase Core (Var, Core) (Var, Core)
+          | CoreTup Core Core
           | CoreSelect Core FstSnd Var Core
+          deriving (Eq)
+
+instance Show Core where show = show . pPrint
 
 instance Pretty Core where
     pPrintPrec level prec t = case t of
         CoreVar x                    -> text x
-        CoreLam x t                  -> prettyParen (prec >= 9) (lambda <> text x <> dot <+> pPrintPrec level 0 t)
+        CoreLam x t                  -> parens (lambda <> text x <+> text "->" <+> pPrintPrec level 0 t)
         CoreApp t1 t2                -> prettyParen (prec >= 9) (pPrintPrec level 0 t1 <+> pPrintPrec level 9 t2)
         CoreLet x t1 t2              -> prettyParen (prec >= 9) (text "let"    <+> text x <+> equals <+> pPrintPrec level 0 t1 $$ text "in" <+> pPrintPrec level 0 t2)
         CoreLetRec x t1 t2           -> prettyParen (prec >= 9) (text "letrec" <+> text x <+> equals <+> pPrintPrec level 0 t1 $$ text "in" <+> pPrintPrec level 0 t2)
+        CoreData lr t                -> prettyParen (prec >= 9) (pPrint lr <+> pPrintPrec level 9 t)
         CoreCase t (x1, t1) (x2, t2) -> prettyParen (prec >= 9) (text "case" <+> pPrintPrec level 0 t <+> text "of" $$ nest 2 (alt Inl x1 t1 $$ alt Inr x2 t2))
           where alt lr x t = hang (pPrint lr <+> text x <+> text "->") 2 (pPrintPrec level 0 t)
+        CoreTup t1 t2                -> parens (pPrintPrec level 0 t1 <> comma <+> pPrintPrec level 0 t2)
         CoreSelect t1 fs x t2        -> prettyParen (prec >= 9) (hang (text "select" <+> pPrintPrec level 0 t1 <+> text "!!" <+> pPrint fs <+> text x <+> text "->") 2 (pPrintPrec level 0 t2))
 
 
@@ -39,9 +46,12 @@ dualize ids (CoreLet v t1 t2) = letin v (dualize ids1 t1) (dualize ids2 t2)
   where (ids1, ids2) = splitIdSupply ids
 dualize ids (CoreLetRec v t1 t2) = letrecin v (dualize ids1 t1) (dualize ids2 t2)
   where (ids1, ids2) = splitIdSupply ids
+dualize ids (CoreData lr t) = Data (dualize ids t) lr
 dualize ids (CoreCase t (y1, t1) (y2, t2)) = Bind (dualize ids2 t `Cut` CoData (CoBind y1 (dualize ids3 t1 `Cut` CoVar a)) (CoBind y2 (dualize ids4 t2 `Cut` CoVar a))) a
   where ids1:ids2:ids3:ids4:_ = splitIdSupplyL ids
         a = "$a" ++ show (idFromSupply ids1)
+dualize ids (CoreTup t1 t2) = Tup (dualize ids1 t1) (dualize ids2 t2)
+  where (ids1, ids2) = splitIdSupply ids
 dualize ids (CoreSelect t1 fs v t2) = Bind (dualize ids2 t1 `Cut` CoTup fs (CoBind v $ dualize ids3 t2 `Cut` CoVar a)) a
   where (ids1, ids') = splitIdSupply ids
         (ids2, ids3) = splitIdSupply ids'

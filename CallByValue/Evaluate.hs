@@ -1,4 +1,4 @@
-module CallByValue.Evaluate( step, eval, value ) where
+module CallByValue.Evaluate( step, eval, value, lam, colam, CallByValue.Evaluate.app ) where
 
 import Substitution
 import Syntax
@@ -45,3 +45,8 @@ value (Lam _ _) = True
 value (Fix _ _) = False
 --value (Bind (m `Cut` CoTup _ (CoVar b)) a) = value m && a == b
 value (Bind _ _) = False
+
+ -- CBV Is Dual To CBN, Reloaded: Section 3, Proposition 3
+lam x m = Not (CoBind wildEcks (Var wildEcks `Cut` CoTup Fst (CoBind x (Var wildEcks `Cut` CoTup Snd (CoNot m)))))
+colam m k = CoNot (Tup m (Not k))
+app m n = Bind (m `Cut` (n `colam` CoVar wildAlpha)) wildAlpha

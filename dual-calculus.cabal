@@ -13,7 +13,8 @@ Category:           Language
 Executable dual-calculus
     Main-Is:        Main.hs
     Build-Depends:  base >= 4 && < 5, containers >= 0.3 && < 0.4,
-                    prettyclass >= 1 && < 1.2, uniqueid >= 0.1.1 && < 0.2
+                    prettyclass >= 1 && < 1.2, uniqueid >= 0.1.1 && < 0.2,
+                    QuickCheck >= 1.2 && < 1.3, random >= 1.0 && < 1.1
     Extensions:     TypeOperators, PatternGuards
 
     Ghc-Options:    -fwarn-unused-binds -fwarn-unused-imports -fwarn-unused-matches

@@ -1,13 +1,16 @@
 module Main where
 
-import qualified CallByName.Evaluate as CallByName
+import qualified CallByName
 -- FIXME: until I can work out how to do it properly:
 -- import qualified CallByNeed.Evaluate as CallByNeed
-import qualified CallByValue.Evaluate as CallByValue
+import qualified CallByValue
 import Core
 import Syntax
+import qualified Test
 
 import Control.Monad
+
+import Data.Unique.Id
 
 import Text.PrettyPrint.HughesPJClass
 
@@ -37,6 +40,11 @@ lamExample1 = CoreLetRec "ones" (CoreApp (CoreApp (CoreVar "Cons") (CoreVar "one
 lamExample2 = CoreLetRec "map" (CoreLam "f" $ CoreLam "xs" $ CoreCase (CoreVar "xs") ("_", CoreVar "Nil_wrap") ("cons", CoreSelect (CoreVar "cons") Fst "y" $ CoreSelect (CoreVar "cons") Snd "ys" $ CoreApp (CoreApp (CoreVar "Cons_wrap") (CoreApp (CoreVar "f") (CoreVar "y"))) $ CoreApp (CoreApp (CoreVar "map") (CoreVar "f")) (CoreVar "ys"))) $
               CoreApp (CoreApp (CoreVar "map") (CoreVar "inc")) $ CoreApp (CoreApp (CoreVar "map") (CoreVar "double")) (CoreVar "input")
 
+
+-- (\x. x) ()
+--
+-- Very basic example!
+dualExample0 = Lam "x" (Var "x") `app` Var "()" `Cut` CoVar "halt"
 
 -- let f = \x. x
 -- in (f (), f 2)
@@ -153,14 +161,23 @@ dualExample1Main = do
     --header "Call by need, first component"
     --printNormalise CallByNeed.step $ dualExample1Term `Cut` CoTup 0 (CoVar "halt")
 
-exampleMain example = do
+exampleMain example ids = do
     header "Original"
     print $ pPrint example
-    header "Call by name"
+    
+    header "Call by name CPS"
+    (ids, ids') <- return $ splitIdSupply ids
+    print $ pPrint $ CallByName.cps ids' example
+    header "Call by name evaluation"
     printNormalise CallByName.step example
+    
     --header "Call by need"
     --printNormalise CallByNeed.step example
-    header "Call by value"
+    
+    header "Call by value CPS"
+    (ids, ids') <- return $ splitIdSupply ids
+    print $ pPrint $ CallByValue.cps ids' example
+    header "Call by value evaluation"
     printNormalise CallByValue.step example
 
 printNormalise step s = do
@@ -169,15 +186,28 @@ printNormalise step s = do
   where steps = take lIMIT $ normalise step s
         lIMIT = 1000
 
-main = forM_ [(False, "Primitive lambdas", dualExample1Main),
-              (True, "Call-by-name vs Call-by-need", exampleMain dualExample2),
-              (False, "Call-by-value vs Call-by-coneed", exampleMain dualExample3),
-              (False, "Russel non-termination", exampleMain dualExample4),
-              (True,  "Fixed points", exampleMain dualExample5),
-              (False, "Black holes", exampleMain dualExample6)
-             ] $ \(enabled, title, example) -> when enabled $ do
+tests :: [(Bool, String, IdSupply -> IO ())]
+tests = [
+    (True, "Basic lambdas", exampleMain dualExample0),
+    (True, "Basic nots", exampleMain (Not (CoVar "alpha") `Cut` CoNot (Var "x"))),
+    (True, "Primitive lambdas", const dualExample1Main),
+    (True, "Call-by-name vs Call-by-need", exampleMain dualExample2),
+    (False, "Call-by-value vs Call-by-coneed", exampleMain dualExample3),
+    (False, "Russel non-termination", exampleMain dualExample4),
+    (False, "Fixed points", exampleMain dualExample5),
+    (True, "Black holes", exampleMain dualExample6)
+  ]
+
+main = do
+  ids:idss <- fmap splitIdSupplyL $ initIdSupply 'a'
+  
+  -- Quickcheck properties of the Dual Calculus
+  Test.main ids
+  
+  -- Some specific interesting examples
+  forM_ (tests `zip` idss) $ \((enabled, title, example), ids) -> when enabled $ do
         header title
-        example
+        example ids
         putStrLn ""
 
 header s = putStrLn $ unwords [replicate 10 '=', s, replicate 10 '=']
